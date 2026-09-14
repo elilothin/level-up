@@ -322,6 +322,17 @@
       </div>
 
       <div class="dark-panel">
+        <h2>💾 Sauvegarde</h2>
+        <div class="cal-target">Exporte tes donnees (poids, niveau, badges, calories, seances) dans un fichier, pour les remettre plus tard sur un autre appareil ou navigateur.</div>
+        <div class="dark-row">
+          <button class="dark-btn teal" onclick="exportData()">Exporter mes donnees</button>
+          <button class="dark-btn" onclick="document.getElementById('import-file').click()">Importer un fichier</button>
+        </div>
+        <input type="file" id="import-file" accept="application/json" style="display:none;" onchange="importData(event)">
+        <div class="cal-target" id="backup-status" style="margin-top:8px;"></div>
+      </div>
+
+      <div class="dark-panel">
         <h2>💡 Conseils par mouvement</h2>
         <div class="tip"><b>Squat / Squat barre :</b> dos droit, hanches en arriere, genoux alignes avec les pieds.</div>
         <div class="tip"><b>Pompes / Developpe couche :</b> corps ou dos gaine, controle la descente.</div>
@@ -931,6 +942,60 @@
         cEl.appendChild(li);
       });
     }
+  }
+
+  // ================= SAUVEGARDE (export / import) =================
+  function allStorageKeys(){
+    const keys = [
+      'workout-checks','used-gym','workout-history','xp-total','quest-log',
+      'weight-start','weight-goal','weight-log','cal-goal-custom','cal-history',
+      'milestone-25','milestone-50','milestone-75','milestone-100'
+    ];
+    for(let di=0; di<program.length; di++){
+      keys.push('day-mode-' + di);
+      keys.push('day-complete-' + di);
+    }
+    return keys;
+  }
+
+  async function exportData(){
+    const data = {};
+    const keys = allStorageKeys();
+    for(const k of keys){
+      try{
+        const r = await storage.get(k);
+        if(r && r.value !== undefined){ data[k] = r.value; }
+      }catch(e){ /* cle absente, on l ignore */ }
+    }
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'level-up-backup-' + todayStr() + '.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    document.getElementById('backup-status').textContent = 'Fichier telecharge. Garde-le pour le restaurer plus tard.';
+  }
+
+  function importData(evt){
+    const file = evt.target.files && evt.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = async function(e){
+      try{
+        const data = JSON.parse(e.target.result);
+        for(const k in data){
+          await storage.set(k, data[k]);
+        }
+        document.getElementById('backup-status').textContent = 'Donnees restaurees. Rechargement...';
+        setTimeout(()=> location.reload(), 1200);
+      }catch(err){
+        document.getElementById('backup-status').textContent = 'Le fichier n est pas valide, reessaie avec ton fichier de sauvegarde.';
+      }
+    };
+    reader.readAsText(file);
   }
 
   // ================= INIT =================
